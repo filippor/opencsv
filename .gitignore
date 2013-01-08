@@ -1,3 +1,7 @@
+.settings
+.externalToolBuilders
+build
+deploy
 target
 myfile.csv
 opencsv.ipr
