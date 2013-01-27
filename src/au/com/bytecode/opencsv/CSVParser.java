@@ -227,45 +227,60 @@ public class CSVParser {
         List<String> tokensOnThisLine = new ArrayList<String>();
         StringBuilder sb = new StringBuilder(INITIAL_READ_SIZE);
         boolean inQuotes = false;
+        int lineLength = nextLine.length();
+        
         if (pending != null) {
             sb.append(pending);
             pending = null;
             inQuotes = !this.ignoreQuotations;//true;
         }
-        for (int i = 0; i < nextLine.length(); i++) {
-
+        else{
+            inField = false;
+        }
+        
+        for (int i = 0; i < lineLength; i++) {
             char c = nextLine.charAt(i);
             if (c == this.escape) {
-                if (isNextCharacterEscapable(nextLine, (inQuotes && !ignoreQuotations) || inField, i)) {
+                if (inField && isNextCharacterEscapable(nextLine, i)) {
                     sb.append(nextLine.charAt(i + 1));
                     i++;
                 }
             } else if (c == quotechar) {
-                if (isNextCharacterEscapedQuote(nextLine, (inQuotes && !ignoreQuotations) || inField, i)) {
+                if (inField && isNextCharacterEscapedQuote(nextLine, i)) {
                     sb.append(nextLine.charAt(i + 1));
                     i++;
                 } else {
-                    inQuotes = !inQuotes;
-
-                    // the tricky case of an embedded quote in the middle: a,bc"d"ef,g
-                    if (!strictQuotes) {
-                        if (i > 2 //not on the beginning of the line
-                                && nextLine.charAt(i - 1) != this.separator //not at the beginning of an escape sequence
-                                && nextLine.length() > (i + 1) &&
-                                nextLine.charAt(i + 1) != this.separator //not at the	end of an escape sequence
-                                ) {
-
-                            if (ignoreLeadingWhiteSpace && sb.length() > 0 && isAllWhiteSpace(sb)) {
-                                sb = new StringBuilder(INITIAL_READ_SIZE);  //discard white space leading up to quote
-                            } else {
-                                sb.append(c);
-                            }
-
+                    boolean shouldToggle = false;
+                    
+                    // If not using strict quotes, check that the quote is not at the beginning or the end of a field.
+                    if (!strictQuotes
+                            && i > 0 // Not at the beginning of the line.
+                            && nextLine.charAt(i - 1) != this.separator // No separator before the current char.
+                            && i < lineLength - 1 // Not at the end of the line.
+                            && nextLine.charAt(i + 1) != this.separator) // No separator after the current char.
+                    {
+                        if (ignoreLeadingWhiteSpace && sb.length() > 0 && isAllWhiteSpace(sb)) {
+                            sb = new StringBuilder(INITIAL_READ_SIZE);  //discard white space leading up to quote
+                            inQuotes = true;
+                            inField = true;
+                        } else {
+                            sb.append(c);
                         }
                     }
+                    else {
+                        shouldToggle = true;
+                    }
+                    
+                    if (shouldToggle){
+                        inQuotes = !inQuotes;
+                        inField = !inField;
+                    }
                 }
-                inField = !inField;
-            } else if (c == separator && !(inQuotes && !ignoreQuotations)) {
+            } else if (!(inQuotes && !ignoreQuotations) // If we are quoted (and we care about quotes) separators should be parsed as regular characters.
+                    && c == this.separator // A separator might start here.
+                    && lineLength >= i + 1 // There is room for the separator.
+                    && nextLine.charAt(i) == this.separator) // There is indeed a separator.
+            {
                 tokensOnThisLine.add(sb.toString());
                 sb = new StringBuilder(INITIAL_READ_SIZE); // start work on next token
                 inField = false;
@@ -298,13 +313,11 @@ public class CSVParser {
      * precondition: the current character is a quote or an escape
      *
      * @param nextLine the current line
-     * @param inQuotes true if the current context is quoted
      * @param i        current index in line
      * @return true if the following character is a quote
      */
-    private boolean isNextCharacterEscapedQuote(String nextLine, boolean inQuotes, int i) {
-        return inQuotes  // we are in quotes, therefore there can be escaped quotes in here.
-                && nextLine.length() > (i + 1)  // there is indeed another character to check.
+    private boolean isNextCharacterEscapedQuote(String nextLine, int i) {
+        return nextLine.length() > (i + 1)  // there is indeed another character to check.
                 && nextLine.charAt(i + 1) == quotechar;
     }
 
@@ -312,13 +325,11 @@ public class CSVParser {
      * precondition: the current character is an escape
      *
      * @param nextLine the current line
-     * @param inQuotes true if the current context is quoted
      * @param i        current index in line
      * @return true if the following character is a quote
      */
-    protected boolean isNextCharacterEscapable(String nextLine, boolean inQuotes, int i) {
-        return inQuotes  // we are in quotes, therefore there can be escaped quotes in here.
-                && nextLine.length() > (i + 1)  // there is indeed another character to check.
+    protected boolean isNextCharacterEscapable(String nextLine, int i) {
+        return nextLine.length() > (i + 1)  // there is indeed another character to check.
                 && (nextLine.charAt(i + 1) == quotechar || nextLine.charAt(i + 1) == this.escape);
     }
 

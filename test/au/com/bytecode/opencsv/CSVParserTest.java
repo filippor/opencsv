@@ -385,7 +385,7 @@ public class CSVParserTest {
         csvParser.parseLine("This,\"is a bad line to parse.");
     }
     
-//    @Test
+    @Test
     public void testQuoteInMiddleOfString() throws IOException {
     	// Because quote didn't occur at beginning of field, we should ignore it
         String[] fields = csvParser.parseLine("This,is not a \"bad line to parse.");
@@ -463,21 +463,18 @@ public class CSVParserTest {
 
     @Test
     public void whichCharactersAreEscapable() {
-        assertTrue(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, true, 0));
-        assertFalse(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, false, 0));
-        // Second character is not escapable because there is a non quote or non slash after it. 
-        assertFalse(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, true, 1));
-        assertFalse(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, false, 1));
-        // Fourth character is not escapable because there is a non quote or non slash after it.
-        assertFalse(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, true, 3));
-        assertFalse(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, false, 3));
-
-        assertTrue(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, true, 5));
-        assertFalse(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, false, 5));
+        // Second character is escapable because it is a slash.
+        assertTrue(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, 0));
+        // Third character is not escapable because it is neither a quote nor a slash.
+        assertFalse(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, 1));
+        // Fifth character is not escapable because it is neither a quote nor a slash.
+        assertFalse(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, 3));
+        // Seventh character is escapable because it is a quote.
+        assertTrue(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, 5));
 
         int lastChar = ESCAPE_TEST_STRING.length() - 1;
-        assertFalse(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, true, lastChar));
-        assertFalse(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, false, lastChar));
+        // No character to escape.
+        assertFalse(csvParser.isNextCharacterEscapable(ESCAPE_TEST_STRING, lastChar));
 
     }
 
@@ -512,14 +509,14 @@ public class CSVParserTest {
         assertEquals("\"hello", nextLine[0]); // "hello
     }
     
-//    @Test
+    @Test
     public void testGreedyQuote() throws IOException {
         String[] nextLine = csvParser.parseLine("\"\"\"\"hello\""); // Escaped quote with extra quote.
         assertEquals(1, nextLine.length);
         assertEquals("\"\"hello", nextLine[0]);
     }
     
-//    @Test
+    @Test
     public void testSecondCharQuote() throws IOException {
         String[] nextLine = csvParser.parseLine("h\"ello");
         assertEquals(1, nextLine.length);
@@ -533,7 +530,7 @@ public class CSVParserTest {
         assertEquals("hello\"", nextLine[0]);
     }
     
-//    @Test
+    @Test
     public void testEveryOtherQuote() throws IOException {
         String[] nextLine = csvParser.parseLine("\"\"h\"\"e\"\"l\"\"l\"\"o\"\"\",h\"e\"l\"l\"o");
         assertEquals(2, nextLine.length);
