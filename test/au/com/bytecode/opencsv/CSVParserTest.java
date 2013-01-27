@@ -78,9 +78,9 @@ public class CSVParserTest {
 
         String[] nextLine = csvParser.parseLine("a,123\"4\"567,c");
         assertEquals(3, nextLine.length);
-
+        assertEquals("a", nextLine[0]);
         assertEquals("123\"4\"567", nextLine[1]);
-
+        assertEquals("c", nextLine[2]);
     }
 
     @Test
@@ -161,6 +161,16 @@ public class CSVParserTest {
     }
 
     @Test
+    public void testEscapedDoubleQuoteAsDataElement2() throws IOException {
+        String[] nextLine = csvParser.parseLine("\"test\",\"this,test,is,good\",\"\\\"test\\\"\",\"\"\"quote\"\"\""); // "test","this,test,is,good","\"test\"","""quote"""
+        assertEquals(4, nextLine.length);
+        assertEquals("test", nextLine[0]);
+        assertEquals("this,test,is,good", nextLine[1]);
+        assertEquals("\"test\"", nextLine[2]);
+        assertEquals("\"quote\"", nextLine[3]);
+    }
+    
+    @Test
     public void parseQuotedQuoteCharacters() throws IOException {
         String[] nextLine = csvParser.parseLineMulti("\"Glen \"\"The Man\"\" Smith\",Athlete,Developer\n");
         assertEquals(3, nextLine.length);
@@ -171,10 +181,19 @@ public class CSVParserTest {
 
     @Test
     public void parseMultipleQuotes() throws IOException {
-        String[] nextLine = csvParser.parseLine("\"\"\"\"\"\",\"test\"\n"); // """""","test"  representing:  "", test
+        String[] nextLine = csvParser.parseLine("\"\"\"\"\"\",\"test\""); // """""","test"  representing:  "", test
         assertEquals("\"\"", nextLine[0]); // check the tricky situation
-        assertEquals("test\"\n", nextLine[1]); // make sure we didn't ruin the next field..
+        assertEquals("test", nextLine[1]); // make sure we didn't ruin the next field..
         assertEquals(2, nextLine.length);
+    }
+    
+    @Test
+    public void parseEmbeddedQuotes() throws IOException {
+        String[] nextLine = csvParser.parseLine("a,bc\"d\"ef,g");
+        assertEquals(3, nextLine.length);
+        assertEquals("a", nextLine[0]);
+        assertEquals("bc\"d\"ef", nextLine[1]);
+        assertEquals("g", nextLine[2]);
     }
 
     @Test
@@ -362,10 +381,15 @@ public class CSVParserTest {
     }
 
     @Test(expected = IOException.class)
-    public void anIOExceptionThrownifStringEndsInsideAQuotedString() throws IOException {
-        String[] nextLine = csvParser.parseLine("This,is a \"bad line to parse.");
-
-
+    public void anIOExceptionThrownifLineEndsInsideAQuotedString() throws IOException {
+        csvParser.parseLine("This,\"is a bad line to parse.");
+    }
+    
+//    @Test
+    public void testQuoteInMiddleOfString() throws IOException {
+    	// Because quote didn't occur at beginning of field, we should ignore it
+        String[] fields = csvParser.parseLine("This,is not a \"bad line to parse.");
+        assertEquals(2,fields.length);
     }
 
     @Test
@@ -400,7 +424,7 @@ public class CSVParserTest {
 
     @Test
     public void returnPendingIfNullIsPassedIntoParseLineMulti() throws IOException {
-        String[] nextLine = csvParser.parseLineMulti("This,\"is a \"goo\\d\" line\\\\ to parse\\");
+        String[] nextLine = csvParser.parseLineMulti("This,\"is a \"good\" line\\\\ to parse\\");
 
         assertEquals(1, nextLine.length);
         assertEquals("This", nextLine[0]);
@@ -429,7 +453,7 @@ public class CSVParserTest {
         assertNull(nextLine);
     }
 
-    private static final String ESCAPE_TEST_STRING = "\\\\1\\2\\\"3\\"; // \\1\2\"\
+    private static final String ESCAPE_TEST_STRING = "\\\\1\\2\\\"3\\"; // \\1\2\"3\
 
     @Test
     public void validateEscapeStringBeforeRealTest() {
@@ -476,6 +500,57 @@ public class CSVParserTest {
         assertEquals("29", nextItem[2]);
         assertEquals("C:\\foo.txt", nextItem[3]);
     }
+    
+    
+    /*
+     * Quote tests START
+     */
+    @Test
+    public void testLeadingQuote() throws IOException {
+        String[] nextLine = csvParser.parseLine("\"\"\"hello\"");
+        assertEquals(1, nextLine.length);
+        assertEquals("\"hello", nextLine[0]); // "hello
+    }
+    
+//    @Test
+    public void testGreedyQuote() throws IOException {
+        String[] nextLine = csvParser.parseLine("\"\"\"\"hello\""); // Escaped quote with extra quote.
+        assertEquals(1, nextLine.length);
+        assertEquals("\"\"hello", nextLine[0]);
+    }
+    
+//    @Test
+    public void testSecondCharQuote() throws IOException {
+        String[] nextLine = csvParser.parseLine("h\"ello");
+        assertEquals(1, nextLine.length);
+        assertEquals("h\"ello", nextLine[0]); // h"ello
+    }
+    
+    @Test
+    public void testTrailingQuote() throws IOException {
+        String[] nextLine = csvParser.parseLine("\"hello\"\"\"");
+        assertEquals(1, nextLine.length);
+        assertEquals("hello\"", nextLine[0]);
+    }
+    
+//    @Test
+    public void testEveryOtherQuote() throws IOException {
+        String[] nextLine = csvParser.parseLine("\"\"h\"\"e\"\"l\"\"l\"\"o\"\"\",h\"e\"l\"l\"o");
+        assertEquals(2, nextLine.length);
+        assertEquals("\"h\"e\"l\"l\"o\"", nextLine[0]); // "h"e"l"l"o"
+        assertEquals("h\"e\"l\"l\"o", nextLine[1]); // h"e"l"l"o
+    }
+    
+    @Test
+    public void testLeadingQuoteAfterSeparator() throws IOException {
+        String[] nextLine = csvParser.parseLine("hello,\"\"\"hello\"\"\"");
+        assertEquals(2, nextLine.length);
+        assertEquals("hello", nextLine[0]);
+        assertEquals("\"hello\"", nextLine[1]);
+    }
+    /*
+     * Quote tests END
+     */
 
     @Test(expected = UnsupportedOperationException.class)
     public void quoteAndEscapeCannotBeTheSame() {
