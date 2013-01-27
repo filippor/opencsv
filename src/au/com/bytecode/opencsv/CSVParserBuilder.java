@@ -31,6 +31,7 @@ package au.com.bytecode.opencsv;
 public class CSVParserBuilder {
 
     char separator = CSVParser.DEFAULT_SEPARATOR;
+    String stringSeparator = null;
     char quoteChar = CSVParser.DEFAULT_QUOTE_CHARACTER;
     char escapeChar = CSVParser.DEFAULT_ESCAPE_CHARACTER;
     boolean strictQuotes = CSVParser.DEFAULT_STRICT_QUOTES;
@@ -47,6 +48,19 @@ public class CSVParserBuilder {
     CSVParserBuilder withSeparator(
             final char separator) {
         this.separator = separator;
+        this.stringSeparator = null;
+        return this;
+    }
+    
+    /**
+     * Sets the delimiter to use for separating entries
+     *
+     * @param separator the delimiter to use for separating entries
+     */
+    CSVParserBuilder withSeparator(
+            final String separator) {
+        this.stringSeparator = separator;
+        this.separator = 0;
         return this;
     }
 
@@ -114,12 +128,24 @@ public class CSVParserBuilder {
      * Constructs CSVParser
      */
     CSVParser build() {
-        return new CSVParser(
-                separator,
-                quoteChar,
-                escapeChar,
-                strictQuotes,
-                ignoreLeadingWhiteSpace,
-                ignoreQuotations);
+    	// Build using new style constructor if we have string separator
+    	if (stringSeparator != null) {
+    		return new CSVParser(
+    				stringSeparator,
+    				quoteChar,
+    				escapeChar,
+    				strictQuotes,
+    				ignoreLeadingWhiteSpace,
+    				ignoreQuotations);		
+    	} else {
+    		// Otherwise use the old style constructor
+    		return new CSVParser(
+    				separator,
+    				quoteChar,
+    				escapeChar,
+    				strictQuotes,
+    				ignoreLeadingWhiteSpace,
+    				ignoreQuotations);
+    	}
     }
 }

@@ -57,11 +57,19 @@ public class CSVParserBuilderTest {
     }
 
     @Test
-    public void testWithSeparator() {
+    public void testWithCharSeparator() {
         final char expected = '1';
         builder.withSeparator(expected);
         assertEquals(expected, builder.separator);
         assertEquals(expected, builder.build().separator);
+    }
+    
+    @Test
+    public void testWithStringSeparator() {
+        final String expected = "11";
+        builder.withSeparator(expected);
+        assertEquals(expected, builder.stringSeparator);
+        assertEquals(expected, builder.build().getSeparator());
     }
 
     @Test

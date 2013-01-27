@@ -29,7 +29,10 @@ import java.util.List;
  */
 public class CSVParser {
 
+	@Deprecated
     final char separator;
+    
+    final private String sepString;
 
     final char quotechar;
 
@@ -99,6 +102,15 @@ public class CSVParser {
      * @param separator the delimiter to use for separating entries.
      */
     public CSVParser(char separator) {
+        this(String.valueOf(separator), DEFAULT_QUOTE_CHARACTER, DEFAULT_ESCAPE_CHARACTER);
+    }
+
+    /**
+     * Constructs CSVParser with supplied string separator.
+     *
+     * @param separator the delimiter to use for separating entries.
+     */
+    public CSVParser(String separator) {
         this(separator, DEFAULT_QUOTE_CHARACTER, DEFAULT_ESCAPE_CHARACTER);
     }
 
@@ -110,6 +122,16 @@ public class CSVParser {
      * @param quotechar the character to use for quoted elements
      */
     public CSVParser(char separator, char quotechar) {
+        this(String.valueOf(separator), quotechar, DEFAULT_ESCAPE_CHARACTER);
+    }
+
+    /**
+     * Constructs CSVParser with supplied separator and quote char.
+     *
+     * @param separator the delimiter to use for separating entries
+     * @param quotechar the character to use for quoted elements
+     */
+    public CSVParser(String separator, char quotechar) {
         this(separator, quotechar, DEFAULT_ESCAPE_CHARACTER);
     }
 
@@ -121,6 +143,17 @@ public class CSVParser {
      * @param escape    the character to use for escaping a separator or quote
      */
     public CSVParser(char separator, char quotechar, char escape) {
+        this(String.valueOf(separator), quotechar, escape, DEFAULT_STRICT_QUOTES);
+    }
+    
+    /**
+     * Constructs CSVReader with supplied separator and quote char.
+     *
+     * @param separator the delimiter to use for separating entries
+     * @param quotechar the character to use for quoted elements
+     * @param escape    the character to use for escaping a separator or quote
+     */
+    public CSVParser(String separator, char quotechar, char escape) {
         this(separator, quotechar, escape, DEFAULT_STRICT_QUOTES);
     }
 
@@ -134,6 +167,19 @@ public class CSVParser {
      * @param strictQuotes if true, characters outside the quotes are ignored
      */
     public CSVParser(char separator, char quotechar, char escape, boolean strictQuotes) {
+        this(String.valueOf(separator), quotechar, escape, strictQuotes, DEFAULT_IGNORE_LEADING_WHITESPACE);
+    }
+
+    /**
+     * Constructs CSVParser with supplied separator and quote char.
+     * Allows setting the "strict quotes" flag
+     *
+     * @param separator    the delimiter to use for separating entries
+     * @param quotechar    the character to use for quoted elements
+     * @param escape       the character to use for escaping a separator or quote
+     * @param strictQuotes if true, characters outside the quotes are ignored
+     */
+    public CSVParser(String separator, char quotechar, char escape, boolean strictQuotes) {
         this(separator, quotechar, escape, strictQuotes, DEFAULT_IGNORE_LEADING_WHITESPACE);
     }
 
@@ -148,6 +194,20 @@ public class CSVParser {
      * @param ignoreLeadingWhiteSpace if true, white space in front of a quote in a field is ignored
      */
     public CSVParser(char separator, char quotechar, char escape, boolean strictQuotes, boolean ignoreLeadingWhiteSpace) {
+        this(String.valueOf(separator), quotechar, escape, strictQuotes, ignoreLeadingWhiteSpace, DEFAULT_IGNORE_QUOTATIONS);
+    }
+
+    /**
+     * Constructs CSVParser with supplied separator and quote char.
+     * Allows setting the "strict quotes" and "ignore leading whitespace" flags
+     *
+     * @param separator               the delimiter to use for separating entries
+     * @param quotechar               the character to use for quoted elements
+     * @param escape                  the character to use for escaping a separator or quote
+     * @param strictQuotes            if true, characters outside the quotes are ignored
+     * @param ignoreLeadingWhiteSpace if true, white space in front of a quote in a field is ignored
+     */
+    public CSVParser(String separator, char quotechar, char escape, boolean strictQuotes, boolean ignoreLeadingWhiteSpace) {
         this(separator, quotechar, escape, strictQuotes, ignoreLeadingWhiteSpace, DEFAULT_IGNORE_QUOTATIONS);
     }
 
@@ -161,15 +221,35 @@ public class CSVParser {
      * @param strictQuotes            if true, characters outside the quotes are ignored
      * @param ignoreLeadingWhiteSpace if true, white space in front of a quote in a field is ignored
      */
-    public CSVParser(char separator, char quotechar, char escape, boolean strictQuotes, boolean ignoreLeadingWhiteSpace,
+    public CSVParser(char separator, char quotechar, char escape, boolean strictQuotes, boolean ignoreLeadingWhiteSpace, boolean ignoreQuotations) {
+        this(String.valueOf(separator), quotechar, escape, strictQuotes, ignoreLeadingWhiteSpace, ignoreQuotations);
+    }
+
+    /**
+     * Constructs CSVParser with supplied separator and quote char.
+     * Allows setting the "strict quotes" and "ignore leading whitespace" flags
+     *
+     * @param separator               the delimiter to use for separating entries
+     * @param quotechar               the character to use for quoted elements
+     * @param escape                  the character to use for escaping a separator or quote
+     * @param strictQuotes            if true, characters outside the quotes are ignored
+     * @param ignoreLeadingWhiteSpace if true, white space in front of a quote in a field is ignored
+     */
+    public CSVParser(String separator, char quotechar, char escape, boolean strictQuotes, boolean ignoreLeadingWhiteSpace,
                      boolean ignoreQuotations) {
+        if (separator == null || (separator.length() == 1 && separator.charAt(0) == NULL_CHARACTER)) {
+            throw new UnsupportedOperationException("The separator character must be defined!");
+        }
         if (anyCharactersAreTheSame(separator, quotechar, escape)) {
             throw new UnsupportedOperationException("The separator, quote, and escape characters must be different!");
         }
-        if (separator == NULL_CHARACTER) {
-            throw new UnsupportedOperationException("The separator character must be defined!");
+        // This field is visible so try to maintain backward compatibility
+        if (separator.length() == 1) {
+        	this.separator = separator.charAt(0);
+        } else {
+        	this.separator = 0;
         }
-        this.separator = separator;
+        this.sepString = separator;
         this.quotechar = quotechar;
         this.escape = escape;
         this.strictQuotes = strictQuotes;
@@ -177,8 +257,8 @@ public class CSVParser {
         this.ignoreQuotations = ignoreQuotations;
     }
 
-    private boolean anyCharactersAreTheSame(char separator, char quotechar, char escape) {
-        return isSameCharacter(separator, quotechar) || isSameCharacter(separator, escape) || isSameCharacter(quotechar, escape);
+    private boolean anyCharactersAreTheSame(String separator, char quotechar, char escape) {
+        return separator.indexOf(quotechar) > -1 || separator.indexOf(escape) > -1 || isSameCharacter(quotechar, escape);
     }
 
     private boolean isSameCharacter(char c1, char c2) {
@@ -227,6 +307,7 @@ public class CSVParser {
         List<String> tokensOnThisLine = new ArrayList<String>();
         StringBuilder sb = new StringBuilder(INITIAL_READ_SIZE);
         boolean inQuotes = false;
+        int separatorLength = this.sepString.length();
         int lineLength = nextLine.length();
         
         if (pending != null) {
@@ -255,9 +336,9 @@ public class CSVParser {
                     // If not using strict quotes, check that the quote is not at the beginning or the end of a field.
                     if (!strictQuotes
                             && i > 0 // Not at the beginning of the line.
-                            && nextLine.charAt(i - 1) != this.separator // No separator before the current char.
+                            && !(separatorLength <= i && nextLine.substring(i - separatorLength, i).equals(this.sepString)) // No separator before the current char.
                             && i < lineLength - 1 // Not at the end of the line.
-                            && nextLine.charAt(i + 1) != this.separator) // No separator after the current char.
+                            && !(i + separatorLength < lineLength && nextLine.substring(i + 1, i + 1 + separatorLength).equals(this.sepString))) // No separator after the current char.
                     {
                         if (ignoreLeadingWhiteSpace && sb.length() > 0 && isAllWhiteSpace(sb)) {
                             sb = new StringBuilder(INITIAL_READ_SIZE);  //discard white space leading up to quote
@@ -277,12 +358,13 @@ public class CSVParser {
                     }
                 }
             } else if (!(inQuotes && !ignoreQuotations) // If we are quoted (and we care about quotes) separators should be parsed as regular characters.
-                    && c == this.separator // A separator might start here.
-                    && lineLength >= i + 1 // There is room for the separator.
-                    && nextLine.charAt(i) == this.separator) // There is indeed a separator.
+                    && c == this.sepString.charAt(0) // A separator might start here.
+                    && lineLength >= i + separatorLength // There is room for the separator.
+                    && nextLine.substring(i, i + separatorLength).equals(this.sepString)) // There is indeed a separator.
             {
                 tokensOnThisLine.add(sb.toString());
                 sb = new StringBuilder(INITIAL_READ_SIZE); // start work on next token
+                i += separatorLength - 1;
                 inField = false;
             } else {
                 if (!strictQuotes || (inQuotes && !ignoreQuotations)) {
@@ -349,5 +431,12 @@ public class CSVParser {
             }
         }
         return result;
+    }
+    
+    /**
+     * @return the current separator
+     */
+    public String getSeparator() {
+    	return this.sepString;
     }
 }

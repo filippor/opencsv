@@ -563,6 +563,11 @@ public class CSVParserTest {
     public void separatorCharacterCannotBeNull() {
         CSVParser p = new CSVParser(CSVParser.NULL_CHARACTER);
     }
+    
+    @Test(expected = UnsupportedOperationException.class)
+    public void separatorCannotBeNull() {
+        new CSVParser(null);
+    }
 
     @Test(expected = UnsupportedOperationException.class)
     public void separatorAndEscapeCannotBeTheSame() {
