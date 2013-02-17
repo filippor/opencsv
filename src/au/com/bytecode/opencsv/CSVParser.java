@@ -46,7 +46,8 @@ public class CSVParser {
     final boolean ignoreLeadingWhiteSpace;
 
     final boolean ignoreQuotations;
-
+    
+    final boolean emptyUnquotedIsNull;
     /**
      * The default separator to use if none is supplied to the constructor.
      */
@@ -83,6 +84,11 @@ public class CSVParser {
      * I.E. if the quote character is set to null then there is no quote character.
      */
     public static final boolean DEFAULT_IGNORE_QUOTATIONS = false;
+    
+    /**
+     * Empty element in file is considered null.
+     */
+    public static final boolean DEFAULT_EMPTY_UNQUOTED_IS_NULL = false;
 
     /**
      * This is the "null" character - if a value is set to this then it is ignored.
@@ -224,7 +230,6 @@ public class CSVParser {
     public CSVParser(char separator, char quotechar, char escape, boolean strictQuotes, boolean ignoreLeadingWhiteSpace, boolean ignoreQuotations) {
         this(String.valueOf(separator), quotechar, escape, strictQuotes, ignoreLeadingWhiteSpace, ignoreQuotations);
     }
-
     /**
      * Constructs CSVParser with supplied separator and quote char.
      * Allows setting the "strict quotes" and "ignore leading whitespace" flags
@@ -235,8 +240,23 @@ public class CSVParser {
      * @param strictQuotes            if true, characters outside the quotes are ignored
      * @param ignoreLeadingWhiteSpace if true, white space in front of a quote in a field is ignored
      */
+    public CSVParser(String separator, char quotechar, char escape, boolean strictQuotes, boolean ignoreLeadingWhiteSpace, boolean ignoreQuotations) {
+    	this(separator, quotechar, escape, strictQuotes, ignoreLeadingWhiteSpace, ignoreQuotations,DEFAULT_EMPTY_UNQUOTED_IS_NULL);
+    }
+
+    /**
+     * Constructs CSVParser with supplied separator and quote char.
+     * Allows setting the "strict quotes" and "ignore leading whitespace" flags
+     *
+     * @param separator               the delimiter to use for separating entries
+     * @param quotechar               the character to use for quoted elements
+     * @param escape                  the character to use for escaping a separator or quote
+     * @param strictQuotes            if true, characters outside the quotes are ignored
+     * @param ignoreLeadingWhiteSpace if true, white space in front of a quote in a field is ignored
+     * @param emptyUnquotedIsNull     if true, when find empty unquoted string resulrt in null string
+     */
     public CSVParser(String separator, char quotechar, char escape, boolean strictQuotes, boolean ignoreLeadingWhiteSpace,
-                     boolean ignoreQuotations) {
+                     boolean ignoreQuotations, boolean emptyUnquotedIsNull) {
         if (separator == null || (separator.length() == 1 && separator.charAt(0) == NULL_CHARACTER)) {
             throw new UnsupportedOperationException("The separator character must be defined!");
         }
@@ -255,9 +275,12 @@ public class CSVParser {
         this.strictQuotes = strictQuotes;
         this.ignoreLeadingWhiteSpace = ignoreLeadingWhiteSpace;
         this.ignoreQuotations = ignoreQuotations;
+        this.emptyUnquotedIsNull = emptyUnquotedIsNull;
     }
 
-    private boolean anyCharactersAreTheSame(String separator, char quotechar, char escape) {
+ 
+
+	private boolean anyCharactersAreTheSame(String separator, char quotechar, char escape) {
         return separator.indexOf(quotechar) > -1 || separator.indexOf(escape) > -1 || isSameCharacter(quotechar, escape);
     }
 
@@ -307,6 +330,7 @@ public class CSVParser {
         List<String> tokensOnThisLine = new ArrayList<String>();
         StringBuilder sb = new StringBuilder(INITIAL_READ_SIZE);
         boolean inQuotes = false;
+        boolean withQotes = false;
         int separatorLength = this.sepString.length();
         int lineLength = nextLine.length();
         
@@ -344,6 +368,7 @@ public class CSVParser {
                             sb = new StringBuilder(INITIAL_READ_SIZE);  //discard white space leading up to quote
                             inQuotes = true;
                             inField = true;
+                            withQotes = true;
                         } else {
                             sb.append(c);
                         }
@@ -355,6 +380,7 @@ public class CSVParser {
                     if (shouldToggle){
                         inQuotes = !inQuotes;
                         inField = !inField;
+                        withQotes = true;
                     }
                 }
             } else if (!(inQuotes && !ignoreQuotations) // If we are quoted (and we care about quotes) separators should be parsed as regular characters.
@@ -362,10 +388,13 @@ public class CSVParser {
                     && lineLength >= i + separatorLength // There is room for the separator.
                     && nextLine.substring(i, i + separatorLength).equals(this.sepString)) // There is indeed a separator.
             {
-                tokensOnThisLine.add(sb.toString());
+				tokensOnThisLine
+						.add((emptyUnquotedIsNull && !withQotes && sb.length() == 0) ? null
+								: sb.toString());
                 sb = new StringBuilder(INITIAL_READ_SIZE); // start work on next token
                 i += separatorLength - 1;
                 inField = false;
+                withQotes = false;
             } else {
                 if (!strictQuotes || (inQuotes && !ignoreQuotations)) {
                     sb.append(c);
@@ -385,7 +414,9 @@ public class CSVParser {
             }
         }
         if (sb != null) {
-            tokensOnThisLine.add(sb.toString());
+        	tokensOnThisLine
+			.add((emptyUnquotedIsNull&&!withQotes&& sb.length() == 0) ? null
+					: sb.toString());
         }
         return tokensOnThisLine.toArray(new String[tokensOnThisLine.size()]);
 

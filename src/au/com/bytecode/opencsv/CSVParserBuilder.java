@@ -39,13 +39,14 @@ public class CSVParserBuilder {
     boolean ignoreLeadingWhiteSpace =
             CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
     boolean ignoreQuotations = CSVParser.DEFAULT_IGNORE_QUOTATIONS;
-
+    
+    boolean emptyUnquotedIsNull = CSVParser.DEFAULT_EMPTY_UNQUOTED_IS_NULL;
     /**
      * Sets the delimiter to use for separating entries
      *
      * @param separator the delimiter to use for separating entries
      */
-    CSVParserBuilder withSeparator(
+    public CSVParserBuilder withSeparator(
             final char separator) {
         this.separator = separator;
         this.stringSeparator = null;
@@ -57,7 +58,7 @@ public class CSVParserBuilder {
      *
      * @param separator the delimiter to use for separating entries
      */
-    CSVParserBuilder withSeparator(
+    public CSVParserBuilder withSeparator(
             final String separator) {
         this.stringSeparator = separator;
         this.separator = 0;
@@ -70,7 +71,7 @@ public class CSVParserBuilder {
      *
      * @param quotechar the character to use for quoted elements
      */
-    CSVParserBuilder withQuoteChar(
+    public CSVParserBuilder withQuoteChar(
             final char quoteChar) {
         this.quoteChar = quoteChar;
         return this;
@@ -82,7 +83,7 @@ public class CSVParserBuilder {
      *
      * @param escape the character to use for escaping a separator or quote
      */
-    CSVParserBuilder withEscapeChar(
+    public CSVParserBuilder withEscapeChar(
             final char escapeChar) {
         this.escapeChar = escapeChar;
         return this;
@@ -95,7 +96,7 @@ public class CSVParserBuilder {
      *
      * @param strictQuotes if true, characters outside the quotes are ignored
      */
-    CSVParserBuilder withStrictQuotes(
+    public CSVParserBuilder withStrictQuotes(
             final boolean strictQuotes) {
         this.strictQuotes = strictQuotes;
         return this;
@@ -107,7 +108,7 @@ public class CSVParserBuilder {
      *
      * @param ignoreLeadingWhiteSpace if true, white space in front of a quote in a field is ignored
      */
-    CSVParserBuilder withIgnoreLeadingWhiteSpace(
+    public CSVParserBuilder withIgnoreLeadingWhiteSpace(
             final boolean ignoreLeadingWhiteSpace) {
         this.ignoreLeadingWhiteSpace = ignoreLeadingWhiteSpace;
         return this;
@@ -118,16 +119,26 @@ public class CSVParserBuilder {
      *
      * @param ignoreQuotations if true, quotations are ignored
      */
-    CSVParserBuilder withIgnoreQuotations(
+    public CSVParserBuilder withIgnoreQuotations(
             final boolean ignoreQuotations) {
         this.ignoreQuotations = ignoreQuotations;
         return this;
+    }
+    /**
+     * Sets the empty unquoted is null - if true, empty unquoted field result is null
+     *
+     * @param ignoreQuotations if true, empty return null
+     */
+    public CSVParserBuilder withEmptyUnquotedIsNull(
+    		final boolean emptyUnquotedIsNull) {
+    	this.emptyUnquotedIsNull = emptyUnquotedIsNull;
+    	return this;
     }
 
     /**
      * Constructs CSVParser
      */
-    CSVParser build() {
+    public CSVParser build() {
     	// Build using new style constructor if we have string separator
     	if (stringSeparator != null) {
     		return new CSVParser(
@@ -136,16 +147,18 @@ public class CSVParserBuilder {
     				escapeChar,
     				strictQuotes,
     				ignoreLeadingWhiteSpace,
-    				ignoreQuotations);		
+    				ignoreQuotations,
+    				emptyUnquotedIsNull);		
     	} else {
     		// Otherwise use the old style constructor
     		return new CSVParser(
-    				separator,
+    				String.valueOf(separator),
     				quoteChar,
     				escapeChar,
     				strictQuotes,
     				ignoreLeadingWhiteSpace,
-    				ignoreQuotations);
+    				ignoreQuotations,
+    				emptyUnquotedIsNull);
     	}
     }
 }
