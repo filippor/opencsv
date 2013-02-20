@@ -16,11 +16,13 @@ package au.com.bytecode.opencsv.object;
  limitations under the License.
  */
 
+import java.io.Closeable;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-public class ObjectReader<T,R> implements Iterable<T> {
+public class ObjectReader<T,R extends Closeable> implements Iterable<T> ,Closeable{
 
 	R csv;
 	private ProcessorStrategy<T,?,R> mapper;
@@ -76,6 +78,11 @@ public class ObjectReader<T,R> implements Iterable<T> {
 		} catch (Exception e) {
 			throw new RuntimeException("Error parsing CSV!", e);
 		}
+	}
+
+
+	public void close() throws IOException {
+		csv.close();
 	}
 
 	

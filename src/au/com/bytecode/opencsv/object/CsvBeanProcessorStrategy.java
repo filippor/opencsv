@@ -7,7 +7,9 @@ import java.beans.PropertyEditor;
 import java.beans.PropertyEditorManager;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import au.com.bytecode.opencsv.CSVReader;
@@ -26,11 +28,14 @@ public class CsvBeanProcessorStrategy<T> implements
 	private boolean withHeader;
 	private String[] nullStrings;
 	private boolean applyQuotesToAll = true;
+	private boolean expandChildBean = true;
+	private String childBeanEclusionPattern = "java.*";
 	
 	
 	
-	private Map<String, PropertyDescriptor> descriptorMap = null;
+	private Map<String,List<PropertyDescriptor>> descriptorMap = null;
 	private Map<Class<?>, PropertyEditor> editorMap = null;
+	private Map<String, PropertyEditor> editorColumnMap = new HashMap<String, PropertyEditor>();
 
 	public CsvBeanProcessorStrategy(Class<T> cls) {
 		this(cls, null, true,true ,true);
@@ -121,14 +126,25 @@ public class CsvBeanProcessorStrategy<T> implements
 		for (int col = 0; col < line.length; col++) {
 			if (col < colums.length) {
 				String value = line[col];
-				PropertyDescriptor prop = descriptorMap
+				List<PropertyDescriptor> prop = descriptorMap
 						.get(cleanColumnName(colums[col]));
-				if ("class".equals(prop.getName())
-						&& Class.class.equals(prop.getPropertyType())) {
+				if ("class".equals(prop.get(prop.size()-1).getName())
+						&& Class.class.equals(prop.get(prop.size()-1).getPropertyType())) {
 						continue;
 				}else{
-					Object obj = convertStringToValue(value, prop);
-					prop.getWriteMethod().invoke(bean, obj);
+					Object obj = convertStringToValue(value, cleanColumnName(colums[col]));
+					Object bean2 = bean; 
+					for (PropertyDescriptor propertyDescriptor : prop) {
+						if(prop.indexOf(propertyDescriptor)==(prop.size()-1))
+							break;
+						Object parent = bean2;
+						bean2 = propertyDescriptor.getReadMethod().invoke(bean2);
+						if(bean2 == null){
+							bean2 = propertyDescriptor.getPropertyType().newInstance();
+							propertyDescriptor.getWriteMethod().invoke(parent, bean2);
+						}
+					}
+					prop.get(prop.size()-1).getWriteMethod().invoke(bean2, obj);
 				}
 			}
 		}
@@ -142,13 +158,17 @@ public class CsvBeanProcessorStrategy<T> implements
 		for (int i = 0; i < values.length; i++) {
 
 			String columnName = cleanColumnName(colums[i]);
-			PropertyDescriptor descriptor = descriptorMap
+			List<PropertyDescriptor> descriptor = descriptorMap
 					.get(columnName);
-			Object value = descriptor.getReadMethod().invoke(bean);
+			Object value = bean;
+			for (PropertyDescriptor propertyDescriptor : descriptor) {
+				value = propertyDescriptor.getReadMethod().invoke(value);
+			}
+			
 			if(!skipClassProperty&& columnName.equals("CLASS")&&value instanceof Class){
 				values[i] = ((Class<?>)value).getName();
 			}else{
-				values[i] = convertValueToString(value, descriptor);
+				values[i] = convertValueToString(value, columnName);
 			}
 		}
 		writer.writeNext(values, applyQuotesToAll);
@@ -156,14 +176,22 @@ public class CsvBeanProcessorStrategy<T> implements
 	}
 
 	private void init() throws IntrospectionException {
-		descriptorMap = new HashMap<String, PropertyDescriptor>();
+		descriptorMap = new HashMap<String, List<PropertyDescriptor>>();
+		
+		List<String> columsTmp = loadProperty(type,new ArrayList<PropertyDescriptor>(),"");
+		
+		colums = columsTmp.toArray(new String[columsTmp.size()]);
+	}
+
+	private List<String> loadProperty(Class<?> type,List<PropertyDescriptor> parent,String parentString) throws IntrospectionException {
 		PropertyDescriptor[] descriptors = Introspector.getBeanInfo(type)
 				.getPropertyDescriptors();
+		
 		int lenght = descriptors.length;
+		
 		if (skipClassProperty)
 			lenght--;
-		colums = new String[lenght];
-		int i = 0;
+		List<String> columsTmp =  new ArrayList<String>(lenght);
 		for (PropertyDescriptor descriptor : descriptors) {
 			if (skipClassProperty) {
 				if ("class".equals(descriptor.getName())
@@ -171,11 +199,18 @@ public class CsvBeanProcessorStrategy<T> implements
 					continue;
 				}
 			}
+			List<PropertyDescriptor> current = new ArrayList<PropertyDescriptor>(parent);
+			current.add(descriptor);
+			if(expandChildBean && !	descriptor.getPropertyType().getName().matches(childBeanEclusionPattern)){
+				
+				columsTmp.addAll(loadProperty(descriptor.getPropertyType(), current,parentString + descriptor.getName()+"."));
+			}else{
 			descriptorMap
-					.put(cleanColumnName(descriptor.getName()), descriptor);
-			colums[i++] = cleanColumnName(descriptor.getName());
+					.put(cleanColumnName(parentString + descriptor.getName()), current);
+			columsTmp.add(cleanColumnName(parentString + descriptor.getName()));
+			}
 		}
-
+		return columsTmp;
 	}
 
 	public void setColumnMapping(String... columns) {
@@ -200,10 +235,23 @@ public class CsvBeanProcessorStrategy<T> implements
 		if (editorMap == null) {
 			editorMap = new HashMap<Class<?>, PropertyEditor>();
 		}
-		addEditorToMap(cls, editor);
+		editorMap.put(cls, editor);
+	}
+	/**
+	 * register a editor to be used for a column
+	 * 
+	 * @param cls
+	 * @param editor
+	 */
+	public void registerEditor(String column, PropertyEditor editor) {
+		if (editorColumnMap == null) {
+			editorColumnMap = new HashMap<String, PropertyEditor>();
+		}
+		editorColumnMap.put(column, editor);
 	}
 
-	private String checkForTrim(String s, PropertyDescriptor prop) {
+	private String checkForTrim(String s, String  column) {
+		PropertyDescriptor prop = descriptorMap.get(column).get(descriptorMap.get(column).size()-1);
 		return trimmableProperty(prop) ? s.trim() : s;
 	}
 
@@ -211,43 +259,49 @@ public class CsvBeanProcessorStrategy<T> implements
 		return !prop.getPropertyType().equals(String.class);
 	}
 
-	private PropertyEditor getPropertyEditorValue(Class<?> cls) {
+	private PropertyEditor getPropertyEditor(String column) throws InstantiationException, IllegalAccessException {
+		PropertyEditor propertyEditor = editorColumnMap.get(column);
+		if(propertyEditor != null)
+			return propertyEditor;
+		
+		PropertyDescriptor propertyDescriptor = descriptorMap.get(column).get(descriptorMap.get(column).size()-1);
+		if(propertyDescriptor.getPropertyEditorClass()!=null){
+			propertyEditor = (PropertyEditor) propertyDescriptor.getPropertyEditorClass().newInstance();
+			editorColumnMap.put(column, propertyEditor);
+			
+		}
+		Class<?> cls = propertyDescriptor.getPropertyType(); 
 		if (editorMap == null) {
 			editorMap = new HashMap<Class<?>, PropertyEditor>();
 		}
 
-		PropertyEditor editor = editorMap.get(cls);
+		propertyEditor = editorMap.get(cls);
 
-		if (editor == null) {
-			editor = PropertyEditorManager.findEditor(cls);
-			addEditorToMap(cls, editor);
+		if (propertyEditor == null) {
+			propertyEditor = PropertyEditorManager.findEditor(cls);
 		}
 
-		return editor;
+		return propertyEditor;
 	}
 
-	private void addEditorToMap(Class<?> cls, PropertyEditor editor) {
-		if (editor != null) {
-			editorMap.put(cls, editor);
-		}
-	}
+	
 
-	private PropertyEditor getPropertyEditor(PropertyDescriptor desc)
+	/*private PropertyEditor getPropertyEditor(PropertyDescriptor desc)
 			throws InstantiationException, IllegalAccessException {
 		Class<?> cls = desc.getPropertyEditorClass();
 		if (null != cls)
 			return (PropertyEditor) cls.newInstance();
 		return getPropertyEditorValue(desc.getPropertyType());
-	}
+	}*/
 
-	private Object convertStringToValue(String string, PropertyDescriptor prop)
+	private Object convertStringToValue(String string, String column)
 			throws InstantiationException, IllegalAccessException {
-		PropertyEditor editor = getPropertyEditor(prop);
+		PropertyEditor editor = getPropertyEditor(column);
 		if (isNull(string))
 			return null;
 		Object obj = string;
 		if (null != editor) {
-			editor.setAsText(checkForTrim(string, prop));
+			editor.setAsText(checkForTrim(string, column));
 			obj = editor.getValue();
 		}
 
@@ -265,13 +319,13 @@ public class CsvBeanProcessorStrategy<T> implements
 		return false;
 	}
 
-	private String convertValueToString(Object value, PropertyDescriptor prop)
+	private String convertValueToString(Object value, String column)
 			throws IllegalAccessException, IllegalArgumentException,
 			InvocationTargetException, InstantiationException {
 		
 		if (value == null)
 			return nullStrings == null?null:nullStrings[0];;
-		PropertyEditor editor = getPropertyEditor(prop);
+		PropertyEditor editor = getPropertyEditor(column);
 		String obj = value.toString();
 		if (null != editor) {
 			editor.setValue(value);

@@ -1,12 +1,15 @@
 package au.com.bytecode.opencsv.object;
 
+import java.io.Closeable;
+import java.io.IOException;
+
 
 /**
  * @author filippor
  * 
  * @param <T>
  */
-public class ObjectWriter<T, W> {
+public class ObjectWriter<T, W extends Closeable> implements Closeable{
 	protected W csv;
 	private ProcessorStrategy<T, W, ?> mapper;
 
@@ -46,6 +49,10 @@ public class ObjectWriter<T, W> {
 		} catch (Exception e) {
 			throw new RuntimeException("Error writing CSV !", e);
 		}
+	}
+
+	public void close() throws IOException {
+		csv.close();
 	}
 
 }

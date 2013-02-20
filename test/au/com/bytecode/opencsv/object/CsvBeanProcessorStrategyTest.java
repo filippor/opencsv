@@ -13,7 +13,10 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import org.junit.Assert;
@@ -21,8 +24,6 @@ import org.junit.Test;
 
 import au.com.bytecode.opencsv.CSVParserBuilder;
 import au.com.bytecode.opencsv.CSVReader;
-import au.com.bytecode.opencsv.CSVReaderBuilder;
-import au.com.bytecode.opencsv.CSVReaderBuilderTest;
 import au.com.bytecode.opencsv.CSVWriter;
 
 public class CsvBeanProcessorStrategyTest {
@@ -447,5 +448,101 @@ public class CsvBeanProcessorStrategyTest {
 			}
 			r.close();
 		}
+	}
+	
+	@Test
+	public void testChildBeanExpansion() throws IOException, ParseException{
+		CsvBeanProcessorStrategy<MockBean2> strat = new CsvBeanProcessorStrategy<MockBean2>(MockBean2.class);
+		strat.registerEditor("DATE", new PropertyEditor() {
+			
+			private Object value;
+			SimpleDateFormat sdf = new SimpleDateFormat();
+			
+			public boolean supportsCustomEditor() {
+				return false;
+			}
+			
+			public void setValue(Object value) {
+				this.value = value;
+				
+			}
+			
+			public void setAsText(String text) throws IllegalArgumentException {
+				try {
+					value = sdf.parse(text);
+				} catch (ParseException e) {
+					throw new IllegalArgumentException(e);
+				}
+				
+			}
+			
+			public void removePropertyChangeListener(PropertyChangeListener listener) {
+				// TODO Auto-generated method stub
+				
+			}
+			
+			public void paintValue(Graphics gfx, Rectangle box) {
+				// TODO Auto-generated method stub
+				
+			}
+			
+			public boolean isPaintable() {
+				// TODO Auto-generated method stub
+				return false;
+			}
+			
+			public Object getValue() {
+				return value;
+			}
+			
+			public String[] getTags() {
+				// TODO Auto-generated method stub
+				return null;
+			}
+			
+			public String getJavaInitializationString() {
+				
+				return "new SimpleDateFormat().parse("+getAsText()+")";
+			}
+			
+			public Component getCustomEditor() {
+				// TODO Auto-generated method stub
+				return null;
+			}
+			
+			public String getAsText() {
+				
+				return sdf.format(value);
+			}
+			
+			public void addPropertyChangeListener(PropertyChangeListener listener) {
+				// TODO Auto-generated method stub
+				
+			}
+		});
+		
+		File f = File.createTempFile("tmp", ".csv"); 
+		ObjectWriter<MockBean2, CSVWriter> objectWriter = new ObjectWriter<MockBean2, CSVWriter>(new CSVWriter(new FileWriter(f)), strat);
+		
+		
+		List<MockBean2> list = new ArrayList<MockBean2>();
+		list.add(new MockBean2("aa", new SimpleDateFormat().parse("2/1/12 12:00 AM"), new MockBean("name", "id", "ord", 12)));
+		
+		objectWriter.write(list);
+		objectWriter.close();
+		print(f);
+		
+		ObjectReader<MockBean2, CSVReader> objectReader = new ObjectReader<MockBean2, CSVReader>(new CSVReader(new FileReader(f)), strat);
+		List<MockBean2> list2 = objectReader.parse();
+		objectReader.close();
+		
+		BufferedReader r = new BufferedReader(new FileReader(f));
+		Assert.assertEquals("\"CHILD.ID\",\"CHILD.NAME\",\"CHILD.NUM\",\"CHILD.ORDERNUMBER\",\"DATE\",\"NAME\"", r.readLine());
+		Assert.assertEquals("\"id\",\"name\",\"12\",\"ord\",\"2/1/12 12:00 AM\",\"aa\"", r.readLine());
+		r.close();
+		Assert.assertArrayEquals(list.toArray(), list2.toArray());
+		
+		
+		
 	}
 }
